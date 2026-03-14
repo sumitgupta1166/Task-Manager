@@ -4,14 +4,20 @@ import api from "../lib/axios";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
-  const [loading, setLoading] = useState(true); // true on first mount (checking session)
+  const [user,    setUser]    = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Check existing session on app load
   useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) { setLoading(false); return; }
+
     api.get("/auth/me")
       .then((res) => setUser(res.data.data))
-      .catch(() => setUser(null))
+      .catch(() => {
+        localStorage.removeItem("accessToken");
+        setUser(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -24,7 +30,9 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const res = await api.post("/auth/login", { email, password });
-    setUser(res.data.data.user);
+    const { user, accessToken } = res.data.data;
+    localStorage.setItem("accessToken", accessToken);
+    setUser(user);
     return res.data;
   }, []);
 
@@ -35,6 +43,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     await api.post("/auth/logout").catch(() => {});
+    localStorage.removeItem("accessToken");
     setUser(null);
   }, []);
 
